@@ -258,7 +258,8 @@ async fn invite_already_invited_user() {
     );
 
     // Check one email was sent, this will be the ownership invite email
-    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 1);
+    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 2);
+    assert!(app.is_email_sent("foo@example.com", "Crate co-owner invited"));
     assert!(app.is_email_sent("invited_user@example.com", "Crate ownership invitation"));
 
     // Then invite the user a second time, the message should point out the user is already invited
@@ -273,7 +274,7 @@ async fn invite_already_invited_user() {
     );
 
     // Check that no new email is sent after the second invitation
-    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 1);
+    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 2);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -297,9 +298,10 @@ async fn invite_with_existing_expired_invite() {
         })
     );
 
-    // Check one email was sent, this will be the ownership invite email
-    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 1);
+    // Check two emails were sent: the invite, and the owner notification.
+    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 2);
     assert!(app.is_email_sent("invited_user@example.com", "Crate ownership invitation"));
+    assert!(app.is_email_sent("foo@example.com", "Crate co-owner invited"));
 
     // Simulate the previous invite expiring
     expire_invitation(&app, krate.id);
@@ -316,8 +318,9 @@ async fn invite_with_existing_expired_invite() {
     );
 
     // Check that the email for the second invite was sent
-    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 2);
+    assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 4);
     assert!(app.is_email_sent("invited_user@example.com", "Crate ownership invitation"));
+    assert!(app.is_email_sent("foo@example.com", "Crate co-owner invited"));
 }
 
 #[tokio::test(flavor = "multi_thread")]

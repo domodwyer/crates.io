@@ -138,6 +138,8 @@ async fn new_crate_owner() {
 
     // Validate a "new co-owner invite" notification email was sent.
     assert!(app.is_email_sent("Bar@example.com", "Crate ownership invitation"));
+    assert!(app.is_email_sent("foo@example.com", "Crate co-owner invited"));
+
     // accept invitation for user to be added as owner
     let krate: Crate = app.db(|conn| Crate::by_name("foo_owner").first(conn).unwrap());
     user2
@@ -274,6 +276,8 @@ async fn modify_multiple_owners() {
 
     assert!(app.is_email_sent("user3@example.com", "Crate ownership invitation"));
     assert!(app.is_email_sent("user2@example.com", "Crate ownership invitation"));
+    assert!(app.is_email_sent("foo@example.com", "Crate co-owner invited"));
+
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.json(),
@@ -511,6 +515,8 @@ async fn test_accept_invitation() {
         .good();
 
     assert!(app.is_email_sent("user_bar@example.com", "Crate ownership invitation"));
+    assert!(app.is_email_sent("foo@example.com", "Crate co-owner invited"));
+
     // New owner accepts the invitation
     invited_user
         .accept_ownership_invitation(&krate.name, krate.id)

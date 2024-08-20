@@ -368,6 +368,7 @@ impl Crate {
             .load(conn)
     }
 
+    /// Modify this crate to add `login` as an owner, requested by `req_user`.
     pub fn owner_add(
         &self,
         app: &App,
@@ -399,6 +400,8 @@ impl Crate {
                             let _ = app.emails.send(&recipient, email);
                         }
 
+                        notify_crate_owners_new_invite(self, app, conn, login, req_user);
+
                         Ok(format!(
                             "user {} has been invited to be an owner of crate {}",
                             user.gh_login, self.name
@@ -424,6 +427,8 @@ impl Crate {
                     .do_update()
                     .set(crate_owners::deleted.eq(false))
                     .execute(conn)?;
+
+                notify_crate_owners_new_invite(self, app, conn, login, req_user);
 
                 Ok(format!(
                     "team {} has been added as an owner of crate {}",
@@ -568,6 +573,81 @@ or go to https://{domain}/me/pending-invites to manage all of your crate ownersh
             token = self.token.expose_secret(),
         )
     }
+}
+
+struct NewCoOwnerInviteEmail<'a> {
+    domain: &'a str,
+    owner: &'a str,
+    crate_name: &'a str,
+    // The username that created the ownership invite.
+    req_user: &'a str,
+    // The invited username.
+    invitee: &'a str,
+}
+
+impl<'a> Email for NewCoOwnerInviteEmail<'a> {
+    const SUBJECT: &'static str = "Crate co-owner invited";
+
+    fn body(&self) -> String {
+        format!(
+            "\
+Hello {owner}!
+
+This email is to let you know that '{invitee}' has been invited to be a co-owner \
+of the '{crate_name}' crate by '{req_user}'.
+
+If this is suspicious, you should revoke the invite immediately: \
+https://{domain}/crates/{crate_name}/settings",
+            domain = self.domain,
+            owner = self.owner,
+            crate_name = self.crate_name,
+            invitee = self.invitee,
+            req_user = self.req_user,
+        )
+    }
+}
+
+// Attempt to notify the `krate` owner(s) that `invitee` has been added as a new
+// co-owner by `req_user`.
+fn notify_crate_owners_new_invite(
+    krate: &Crate,
+    app: &App,
+    conn: &mut impl Conn,
+    invitee: &str,
+    req_user: &User,
+) {
+    // Attempt to notify the crate owner(s) that a new co-owner has been
+    // added.
+    match krate.owners_emails(conn) {
+        Ok(recipients) => {
+            for (owner_username, owner_email) in recipients {
+                let email = NewCoOwnerInviteEmail {
+                    domain: &app.config.domain_name,
+                    owner: &owner_username,
+                    crate_name: &krate.name,
+                    req_user: &req_user.gh_login,
+                    invitee,
+                };
+
+                // Do not fail the API request if the owner notification
+                // email errors.
+                if let Err(e) = app.emails.send(&owner_email, email) {
+                    error!(
+                            "Failed to send new co-owner added notification email for '{crate_name}' to \
+                            '{owner_username}': {e}",
+
+                            crate_name = krate.name,
+                        )
+                }
+            }
+        }
+        Err(e) => {
+            error!(
+                "Failed to load owners list to send notification email for '{crate_name}': {e}",
+                crate_name = krate.name,
+            )
+        }
+    };
 }
 
 pub trait CrateVersions {
