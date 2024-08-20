@@ -200,6 +200,36 @@ impl TestApp {
             .clone()
             .expect("ChaosProxy is not enabled on this test, call with_database during app init")
     }
+
+    /// Return true if an email with `to` as a recipient and a (plain-text,
+    /// printable ascii) `subject` substring is found in the emails sent by this
+    /// [`TestApp`].
+    #[track_caller]
+    pub(crate) fn is_email_sent(&self, to: &str, subject: &str) -> bool {
+        let to = to.split('@').collect::<Vec<_>>();
+        let to_user = to[0];
+        let to_domain = to[1];
+
+        let emails = self
+            .as_inner()
+            .emails
+            .mails_in_memory()
+            .expect("not using in-memory email sink");
+
+        // Find all emails to "to" that contain the substring "Subject:
+        // <subject>".
+        emails.iter().any(|(envelope, body)| {
+            let correct_recipient = envelope
+                .to()
+                .iter()
+                .any(|v| v.user() == to_user && v.domain() == to_domain);
+
+            // Only works for plain-text, printable ASCII subjects.
+            let correct_body = body.contains(&format!("Subject: {subject}"));
+
+            correct_recipient && correct_body
+        })
+    }
 }
 
 pub struct TestAppBuilder {
