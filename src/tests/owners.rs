@@ -136,6 +136,8 @@ async fn new_crate_owner() {
     let user2 = app.db_new_user("Bar");
     token.add_named_owner("foo_owner", "BAR").await.good();
 
+    // Validate a "new co-owner invite" notification email was sent.
+    assert!(app.is_email_sent("Bar@example.com", "Crate ownership invitation"));
     // accept invitation for user to be added as owner
     let krate: Crate = app.db(|conn| Crate::by_name("foo_owner").first(conn).unwrap());
     user2
@@ -165,6 +167,13 @@ async fn create_and_add_owner(
 ) -> MockCookieUser {
     let user = app.db_new_user(username);
     token.add_named_owner(&krate.name, username).await.good();
+
+    // Validate an invite notification email was sent.
+    assert!(app.is_email_sent(
+        &format!("{username}@example.com"),
+        "Crate ownership invitation"
+    ));
+
     user.accept_ownership_invitation(&krate.name, krate.id)
         .await;
     user
@@ -262,6 +271,9 @@ async fn modify_multiple_owners() {
     let response = token
         .add_named_owners("owners_multiple", &["user2", "user3"])
         .await;
+
+    assert!(app.is_email_sent("user3@example.com", "Crate ownership invitation"));
+    assert!(app.is_email_sent("user2@example.com", "Crate ownership invitation"));
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.json(),
@@ -498,6 +510,7 @@ async fn test_accept_invitation() {
         .await
         .good();
 
+    assert!(app.is_email_sent("user_bar@example.com", "Crate ownership invitation"));
     // New owner accepts the invitation
     invited_user
         .accept_ownership_invitation(&krate.name, krate.id)

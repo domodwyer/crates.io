@@ -259,6 +259,7 @@ async fn invite_already_invited_user() {
 
     // Check one email was sent, this will be the ownership invite email
     assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 1);
+    assert!(app.is_email_sent("invited_user@example.com", "Crate ownership invitation"));
 
     // Then invite the user a second time, the message should point out the user is already invited
     let response = owner.add_named_owner("crate_name", "invited_user").await;
@@ -298,6 +299,7 @@ async fn invite_with_existing_expired_invite() {
 
     // Check one email was sent, this will be the ownership invite email
     assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 1);
+    assert!(app.is_email_sent("invited_user@example.com", "Crate ownership invitation"));
 
     // Simulate the previous invite expiring
     expire_invitation(&app, krate.id);
@@ -315,6 +317,7 @@ async fn invite_with_existing_expired_invite() {
 
     // Check that the email for the second invite was sent
     assert_eq!(app.as_inner().emails.mails_in_memory().unwrap().len(), 2);
+    assert!(app.is_email_sent("invited_user@example.com", "Crate ownership invitation"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
