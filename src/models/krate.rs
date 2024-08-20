@@ -354,6 +354,20 @@ impl Crate {
         Ok(users.chain(teams).collect())
     }
 
+    /// Return the set of `(username, email)` tuples for the (user) owners of
+    /// this crate.
+    ///
+    /// Teams do not have email addresses, and are therefore not included in the
+    /// returned values.
+    pub fn owners_emails(&self, conn: &mut impl Conn) -> QueryResult<Vec<(String, String)>> {
+        CrateOwner::by_owner_kind(OwnerKind::User)
+            .filter(crate_owners::crate_id.eq(self.id))
+            .inner_join(users::table)
+            .inner_join(emails::table.on(emails::user_id.eq(users::id)))
+            .select((users::gh_login, emails::email))
+            .load(conn)
+    }
+
     pub fn owner_add(
         &self,
         app: &App,
